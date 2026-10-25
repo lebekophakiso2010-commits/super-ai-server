@@ -35,31 +35,47 @@ jobs:
           android.minapi = 21
           android.ndk = 25b
           android.accept_sdk_license_agreement = True
+          p4a.build_tools_version = 33.0.1
           [buildozer]
           log_level = 2
           warn_on_root = 1
           EOF
 
-      - name: Build APK
+      - name: Build APK - FINAL AIDL FIX
         run: |
           set +e
           mkdir -p ~/.android
           touch ~/.android/repositories.cfg
+          # 1. Let buildozer download SDK first
           python3.10 -m buildozer android update || true
-          mkdir -p ~/.buildozer/android/platform/android-sdk/licenses
-          echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
-          echo "d56f5187479451eabf01fb78af6dfcb131a6481e" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-preview-license
-          echo "24333f8a63b6825ea9c5514f83c1051b8ea9b4eac" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-preview-license-old
+          # 2. Create ALL license files in ALL places
+          for LIC_DIR in ~/.buildozer/android/platform/android-sdk/licenses ~/.android/licenses; do
+            mkdir -p $LIC_DIR
+            echo -e "8933bad161af4178b1185d1a37fbf41ea5269c55\nd56f5187479451eabf01fb78af6dfcb131a6481e\n24333f8a63b6825ea9c5514f83c1051b8ea9b4eac" > $LIC_DIR/android-sdk-license
+            echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > $LIC_DIR/android-sdk-preview-license 2>/dev/null || true
+          done
           SDK_MGR=$(find $HOME/.buildozer -name sdkmanager -type f | head -n1)
           echo "SDKMGR=$SDK_MGR"
-          if [ -n "$SDK_MGR" ]; then
-            yes | $SDK_MGR --licenses > /dev/null || true
-            $SDK_MGR --install "build-tools;37.0.0" --verbose || true
-            $SDK_MGR --install "platforms;android-33" "platform-tools" || true
+          yes | $SDK_MGR --licenses || true
+          $SDK_MGR --install "build-tools;33.0.1" "platforms;android-33" "platform-tools" || true
+          # 3. THE TRICK: Create fake 37.0.0 with aidl from 33.0.1
+          BT33="$HOME/.buildozer/android/platform/android-sdk/build-tools/33.0.1"
+          BT37="$HOME/.buildozer/android/platform/android-sdk/build-tools/37.0.0"
+          if [ -f "$BT33/aidl" ]; then
+            echo "Found aidl in 33.0.1, copying to fake 37.0.0"
+            mkdir -p $BT37
+            cp -r $BT33/* $BT37/ || true
+            cp $BT33/aidl $BT37/aidl || true
+            chmod +x $BT37/aidl
+            ls -lh $BT37/aidl
+          else
+            echo "33.0.1 aidl not found, installing via apt as backup"
+            sudo apt install -y aidl 2>/dev/null || true
+            mkdir -p $BT37
+            which aidl && sudo cp $(which aidl) $BT37/aidl || true
           fi
-          echo "--- Checking aidl ---"
-          find ~/.buildozer -name aidl -type f
-          ls ~/.buildozer/android/platform/android-sdk/build-tools/37.0.0/ || true
+          ls -lh $HOME/.buildozer/android/platform/android-sdk/build-tools/
+          find $HOME/.buildozer -name aidl
           set -e
           python3.10 -m buildozer -v android debug
 
