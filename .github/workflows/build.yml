@@ -13,7 +13,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y python3.10 python3-pip openjdk-17-jdk git zip unzip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev libltdl-dev
+          sudo apt install -y python3.10 python3-pip openjdk-17-jdk git zip unzip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev libltdl-dev libltdl7
           python3.10 -m pip install --upgrade pip
           python3.10 -m pip install "cython==0.29.36" buildozer
 
@@ -42,20 +42,31 @@ jobs:
 
       - name: Fix Aidl - Install Build-Tools 37
         run: |
+          set +e
           mkdir -p ~/.android
           touch ~/.android/repositories.cfg
+          echo "Running first update to download SDK..."
           python3.10 -m buildozer android update || true
           mkdir -p ~/.buildozer/android/platform/android-sdk/licenses
           echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
           echo "d56f5187479451eabf01fb78af6dfcb131a6481e" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-preview-license
           echo "24333f8a63b6825ea9c5514f83c1051b8ea9b4eac" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-preview-license-old
-          SDK_MGR=$(find $HOME/.buildozer -name sdkmanager -type f | head -n1)
-          echo "Installing Build-Tools 37.0.0 with $SDK_MGR"
-          yes | $SDK_MGR --licenses || true
-          $SDK_MGR --install "build-tools;37.0.0" "platforms;android-33" "platform-tools" || true
-          ls -lh ~/.buildozer/android/platform/android-sdk/build-tools/
-          ls -lh ~/.buildozer/android/platform/android-sdk/build-tools/37.0.0/aidl || echo "aidl still missing"
-          
+          SDK_MGR=$(find $HOME/.buildozer -name sdkmanager -type f 2>/dev/null | head -n1)
+          if [ -z "$SDK_MGR" ]; then
+            SDK_MGR=$(find $HOME -name sdkmanager -type f 2>/dev/null | head -n1)
+          fi
+          echo "SDK Manager: $SDK_MGR"
+          if [ -n "$SDK_MGR" ]; then
+            yes | $SDK_MGR --licenses || true
+            $SDK_MGR --install "build-tools;37.0.0" || true
+            $SDK_MGR --install "platforms;android-33" "platform-tools" || true
+            echo "Checking aidl..."
+            find ~/.buildozer -name aidl -type f 2>/dev/null
+            ls -lh ~/.buildozer/android/platform/android-sdk/build-tools/37.0.0/ || true
+          fi
+          echo "Fix step done - forcing success"
+          exit 0
+
       - name: Build APK
         run: |
           python3.10 -m buildozer -v android debug
