@@ -12,7 +12,7 @@ from kivy.clock import Clock
 import json, os, random, requests, datetime
 
 DATA_FILE = "superai_data.json"
-SERVER_URL = "https://super-ai-server-xxxx.onrender.com"
+SERVER_URL = "https://super-ai-server.onrender.com"
 LANGUAGES = ["English","Zulu","Xhosa","Afrikaans","Sotho","French","Portuguese","Swahili","Shona","Arabic","Hindi","Spanish"]
 
 def load_data():
