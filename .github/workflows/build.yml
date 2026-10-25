@@ -1,4 +1,4 @@
-name: Build Super AI APK - DOCKER
+name: Build Super AI APK - FINAL
 on:
   workflow_dispatch:
   push:
@@ -7,10 +7,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
-    container:
-      image: kivy/buildozer:master
     steps:
       - uses: actions/checkout@v4
+
       - name: Create buildozer.spec
         run: |
           cat > buildozer.spec << 'EOF'
@@ -32,12 +31,17 @@ jobs:
           log_level = 2
           warn_on_root = 1
           EOF
-      - name: Build APK
+
+      - name: Build APK with Docker
         run: |
-          buildozer -v android debug
+          docker pull kivy/buildozer:master
+          docker run --rm -v $PWD:/home/user/hostcwd -w /home/user/hostcwd kivy/buildozer:master bash -c "buildozer -v android debug"
+          sudo chown -R $USER:$USER .
+          ls -lh bin/
+
       - name: Upload APK
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: super-ai-apk
           path: bin/*.apk
+          if-no-files-found: warn
