@@ -32,9 +32,34 @@ jobs:
           pip install --upgrade pip
           pip install cython==0.29.36 buildozer
 
+      - name: Fix buildozer.spec (force create)
+        run: |
+          rm -f buildozer.spec
+          cat > buildozer.spec << 'EOF'
+          [app]
+          title = Super AI
+          package.name = superai
+          package.domain = com.superai.app
+          source.dir = .
+          source.include_exts = py,png,jpg,kv,atlas
+          version = 1.0
+          requirements = python3,kivy==2.3.0,requests
+          orientation = portrait
+          fullscreen = 0
+          android.permissions = INTERNET
+          android.api = 33
+          android.minapi = 21
+          android.ndk = 25b
+          android.accept_sdk_license_agreement = True
+          [buildozer]
+          log_level = 2
+          warn_on_root = 1
+          EOF
+          cat buildozer.spec
+          ls -lh
+
       - name: Build APK
         run: |
-          ls -la
           buildozer android debug
 
       - name: Upload APK Artifact
