@@ -8,24 +8,29 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
+      
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Set up Python 3.10
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-      - name: Install system dependencies
+
+      - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y git zip unzip openjdk-17-jdk python3-pip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev libltdl-dev
-      - name: Install buildozer
-        run: |
+          sudo apt install -y git zip unzip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev libltdl-dev
           pip install --upgrade pip
           pip install cython==0.29.36 buildozer
-      - name: Create correct buildozer.spec
+
+      - name: Create buildozer.spec
         run: |
           cat > buildozer.spec << 'EOF'
           [app]
@@ -42,24 +47,22 @@ jobs:
           android.api = 33
           android.minapi = 21
           android.ndk = 25b
-          android.sdk = 33
-          android.build_tools_version = 33.0.2
           android.accept_sdk_license_agreement = True
           [buildozer]
           log_level = 2
           warn_on_root = 1
           EOF
-      - name: Accept Android licenses
+          cat buildozer.spec
+
+      - name: Accept licenses & install build-tools
         run: |
-          mkdir -p ~/.android
-          touch ~/.android/repositories.cfg
-          mkdir -p ~/.buildozer/android/platform/android-sdk/licenses
-          echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
-          echo "d56f5187479451eabf01fb78af6dfcb131a6481e" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-preview-license
-          echo "24333f8a63b6825ea9c5514f83c1051b8ea9b4eac" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-preview-license-old
+          yes | sdkmanager --licenses
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.1" "ndk;25b"
+
       - name: Build APK
         run: |
           buildozer android debug
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
