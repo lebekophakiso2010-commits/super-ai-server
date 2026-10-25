@@ -1,4 +1,4 @@
-name: Build Super AI APK
+name: Build Super AI APK - DOCKER
 on:
   workflow_dispatch:
   push:
@@ -7,16 +7,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    container:
+      image: kivy/buildozer:master
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y python3.10 python3-pip openjdk-17-jdk git zip unzip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev libltdl-dev libltdl7
-          python3.10 -m pip install --upgrade pip
-          python3.10 -m pip install "cython==0.29.36" buildozer
-
       - name: Create buildozer.spec
         run: |
           cat > buildozer.spec << 'EOF'
@@ -34,55 +28,16 @@ jobs:
           android.api = 33
           android.minapi = 21
           android.ndk = 25b
-          android.accept_sdk_license_agreement = True
-          p4a.build_tools_version = 33.0.1
           [buildozer]
           log_level = 2
           warn_on_root = 1
           EOF
-
-      - name: Build APK - FINAL AIDL FIX
+      - name: Build APK
         run: |
-          set +e
-          mkdir -p ~/.android
-          touch ~/.android/repositories.cfg
-          # 1. Let buildozer download SDK first
-          python3.10 -m buildozer android update || true
-          # 2. Create ALL license files in ALL places
-          for LIC_DIR in ~/.buildozer/android/platform/android-sdk/licenses ~/.android/licenses; do
-            mkdir -p $LIC_DIR
-            echo -e "8933bad161af4178b1185d1a37fbf41ea5269c55\nd56f5187479451eabf01fb78af6dfcb131a6481e\n24333f8a63b6825ea9c5514f83c1051b8ea9b4eac" > $LIC_DIR/android-sdk-license
-            echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > $LIC_DIR/android-sdk-preview-license 2>/dev/null || true
-          done
-          SDK_MGR=$(find $HOME/.buildozer -name sdkmanager -type f | head -n1)
-          echo "SDKMGR=$SDK_MGR"
-          yes | $SDK_MGR --licenses || true
-          $SDK_MGR --install "build-tools;33.0.1" "platforms;android-33" "platform-tools" || true
-          # 3. THE TRICK: Create fake 37.0.0 with aidl from 33.0.1
-          BT33="$HOME/.buildozer/android/platform/android-sdk/build-tools/33.0.1"
-          BT37="$HOME/.buildozer/android/platform/android-sdk/build-tools/37.0.0"
-          if [ -f "$BT33/aidl" ]; then
-            echo "Found aidl in 33.0.1, copying to fake 37.0.0"
-            mkdir -p $BT37
-            cp -r $BT33/* $BT37/ || true
-            cp $BT33/aidl $BT37/aidl || true
-            chmod +x $BT37/aidl
-            ls -lh $BT37/aidl
-          else
-            echo "33.0.1 aidl not found, installing via apt as backup"
-            sudo apt install -y aidl 2>/dev/null || true
-            mkdir -p $BT37
-            which aidl && sudo cp $(which aidl) $BT37/aidl || true
-          fi
-          ls -lh $HOME/.buildozer/android/platform/android-sdk/build-tools/
-          find $HOME/.buildozer -name aidl
-          set -e
-          python3.10 -m buildozer -v android debug
-
+          buildozer -v android debug
       - name: Upload APK
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: super-ai-apk
           path: bin/*.apk
-          if-no-files-found: warn
